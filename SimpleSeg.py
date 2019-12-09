@@ -148,8 +148,8 @@ def SimpleSeg(image, output_name, settings=settings):
     - Target image is cropped
     """
     # Settings
-    quick_reg_settings = {"shrinkFactors": [8, 4],
-                          "smoothSigmas": [2, 0],
+    quick_reg_settings = {"shrinkFactors": [8, 2],
+                          "smoothSigmas": [8, 2],
                           "samplingRate": 0.2
                          }
 
@@ -360,7 +360,7 @@ def SimpleSeg(image, output_name, settings=settings):
             combined_label_dict[structure_name], optimal_threshold
         )
         paste_img = sitk.Paste(
-            template_im, binary_struct, binary_struct.GetSize(), (0, 0, 0), bounding_box[:3]
+            template_im, binary_struct, binary_struct.GetSize(), (0, 0, 0), crop_box_index
         )
 
         # Write the mask to a file in the working_dir
