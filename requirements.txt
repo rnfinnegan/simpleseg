@@ -1,0 +1,10 @@
+numpy
+pyyaml
+nibabel
+itk >= 5.0a1
+vtk
+SimpleITK
+scikit-image
+click
+pydicom
+loguru

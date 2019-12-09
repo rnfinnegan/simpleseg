@@ -105,7 +105,7 @@ if __name__ == '__main__':
     manual_dir = settings['manual_dir']
     auto_dir = settings['auto_dir']
 
-    test_id = 'Test-S1-101'
+    test_id = 'Train-S1-009'
 
     # Read manual & auto structures
     manual_struct = {i:sitk.ReadImage(f'{manual_dir}/{test_id}/Structures/{test_id}_{i}.nii.gz') for i in labels}

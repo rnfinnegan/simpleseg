@@ -41,7 +41,7 @@ settings = {
         "atlasPath": "./data",
     },
     "autoCropSettings": {
-        "expansion": 25
+        "expansion": 10
     },
     "rigidSettings": {
         "initialReg": "Rigid",
