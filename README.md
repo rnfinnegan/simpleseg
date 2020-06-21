@@ -1,11 +1,19 @@
 # SimpleSeg
 
-An open-source, Python-based atlas-based segmentation framework. If you use this code in a publication please cite [this paper](https://doi.org/10.1088/1361-6560/ab0ea6):
+An open-source, Python-based atlas-based segmentation framework. If you use this code in a publication please cite:
 
 
-> Finnegan, R., Dowling, J., Koh, E.-S., Tang, S., Otton, J., Delaney, G., Batumalai, V., Luo, C., Atluri, P., Satchithanandha, A., Thwaites, D., Holloway, L. (2019). Feasibility of multi-atlas cardiac segmentation from thoracic planning CT in a probabilistic framework. Physics in Medicine & Biology, 64(8), 085006. https://doi.org/10.1088/1361-6560/ab0ea6
+> Finnegan, R., Dowling, J., Koh, E.-S., Tang, S., Otton, J., Delaney, G., Batumalai, V., Luo, C., Atluri, P., Satchithanandha, A., Thwaites, D., Holloway, L. (2019). Feasibility of multi-atlas cardiac segmentation from thoracic planning CT in a probabilistic framework. Phys. Med. Biol. 64(8) 085006. https://doi.org/10.1088/1361-6560/ab0ea6
 
 
+If you also use the code for iterative atlas selection, please cite:
+
+> Finnegan, R., Lorenzen, E., Dowling, J., Holloway, L., Thwaites, D., Brink, C. (2020). Localised delineation uncertainty for iterative atlas selection in automatic cardiac segmentation. Phys. Med. Biol. 65(3) 035011. https://doi.org/10.1088/1361-6560/ab652a
+
+There are tools available for the following:
+- Muli-atlas based segmentation
+- Atlas-based cardiac vessel splining
+- Probability threshold optimisation
 
 ## Design Aims
 
