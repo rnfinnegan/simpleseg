@@ -1,10 +1,11 @@
 # SimpleSeg
 
-An open-source, Python-based atlas-based segmentation framework. If you use this code in a publication please cite:
+An open-source, Python-based atlas-based segmentation framework. If you use this code in a publication please cite [this paper](https://doi.org/10.1088/1361-6560/ab0ea6):
 
-```
-Finnegan, R., Dowling, J., Koh, E.-S., Tang, S., Otton, J., Delaney, G., Batumalai, V., Luo, C., Atluri, P., Satchithanandha, A., Thwaites, D., Holloway, L. (2019). Feasibility of multi-atlas cardiac segmentation from thoracic planning CT in a probabilistic framework. Physics in Medicine & Biology, 64(8), 085006. https://doi.org/10.1088/1361-6560/ab0ea6
-```
+
+> Finnegan, R., Dowling, J., Koh, E.-S., Tang, S., Otton, J., Delaney, G., Batumalai, V., Luo, C., Atluri, P., Satchithanandha, A., Thwaites, D., Holloway, L. (2019). Feasibility of multi-atlas cardiac segmentation from thoracic planning CT in a probabilistic framework. Physics in Medicine & Biology, 64(8), 085006. https://doi.org/10.1088/1361-6560/ab0ea6
+
+
 
 ## Design Aims
 
