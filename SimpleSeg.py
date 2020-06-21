@@ -10,22 +10,22 @@ import SimpleITK as sitk
 import numpy as np
 from loguru import logger
 
-from simpleseg.code.atlas.registration import (
+from SimpleSeg.code.atlas.registration import (
     initial_registration,
     transform_propagation,
     fast_symmetric_forces_demons_registration,
     apply_field,
 )
 
-from simpleseg.code.atlas.label import (
+from SimpleSeg.code.atlas.label import (
     compute_weight_map,
     combine_labels,
     process_probability_image,
 )
 
-from simpleseg.code.atlas.iterative_atlas_removal import run_iar
+from SimpleSeg.code.atlas.iterative_atlas_removal import run_iar
 
-from simpleseg.code.thorax.thoracic_utils import (
+from SimpleSeg.code.thorax.thoracic_utils import (
     AutoLungSegment,
     CropImage,
     vesselSplineGeneration,
@@ -91,7 +91,7 @@ settings = {
 
 def SimpleSeg(image, output_name, settings=settings):
     """
-    Implements the simpleseg framework to provide cardiac atlas based segmentation.
+    Implements the SimpleSeg framework to provide cardiac atlas based segmentation.
 
     """
 
