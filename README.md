@@ -37,6 +37,12 @@ Before starting, make sure you have Python (version 3) and a Python package mana
 pip install -r requirements.txt
 ```
 
+You will need to add the module to your **PYTHONPATH**, e.g.:
+
+```
+export PYTHONPATH="/path/to/containing/directory":$PYTHONPATH
+```
+
 ### Included dataset
 
 We have included a dataset in this repository, accessed from The Cancer Imaging Archive:
