@@ -1,13 +1,11 @@
 """
-Service to run multi-atlas based cardiac segmentation.
-
-Rob Finnegan
-December 9, 2019
+Service to run cardiac segmentation.
 """
-import os
 
 import SimpleITK as sitk
 import numpy as np
+import os
+
 from loguru import logger
 
 from simpleseg.code.atlas.registration import (
@@ -25,78 +23,79 @@ from simpleseg.code.atlas.label import (
 
 from simpleseg.code.atlas.iterative_atlas_removal import run_iar
 
-from simpleseg.code.thorax.thoracic_utils import (
-    AutoLungSegment,
-    CropImage,
-    vesselSplineGeneration,
-)
+from simpleseg.code.cardiac.cardiac import vesselSplineGeneration
 
-settings = {
-    "outputSettings": {
-        "outputDir": "./output"
-    },
+
+CARDIAC_SETTINGS_DEFAULTS = {
+    "outputFormat": "Auto_{0}.nii.gz",
     "atlasSettings": {
-        "atlasIdList": ["Train-S1-001", "Train-S1-002", "Train-S1-003", "Train-S1-004", "Train-S1-005", "Train-S1-006", "Train-S1-007", "Train-S1-008"],
-        "atlasStructures": ["HEART", "LUNG_L", "LUNG_R", "SPINALCORD", "ESOPHAGUS"],
-        "atlasPath": "./data",
+        "atlasIdList": ["Train-S1-001","Train-S1-003","Train-S1-004","Train-S1-005"],
+        "atlasStructures": ["HEART"],
+        "atlasPath": './data',
+        "atlasImageFormat": "{0}/Images/{0}_CROP.nii.gz",
+        "atlasLabelFormat": "{0}/Structures/{0}_{1}_CROP.nii.gz",
     },
-    "autoCropSettings": {
-        "expansion": 10
-    },
+    "autoCropSettings": {"expansion": [2, 2, 2],},
     "rigidSettings": {
-        "initialReg": "Rigid",
+        "initialReg": "Similarity",
         "options": {
-            "shrinkFactors": [8, 2, 1],
-            "smoothSigmas": [8, 2, 1],
-            "samplingRate": 0.25,
+            "shrinkFactors": [16, 8, 4],
+            "smoothSigmas": [0, 0, 0],
+            "samplingRate": 0.75,
+            "defaultValue": -1024,
+            "numberOfIterations": 50,
             "finalInterp": sitk.sitkBSpline,
+            "metric": "mean_squares",
         },
-        "trace": True,
+        "trace": False,
         "guideStructure": False,
     },
     "deformableSettings": {
-        "resolutionStaging": [8,4,2,1],
-        "iterationStaging": [150,100,50,25],
+        "isotropicResample": True,
+        "resolutionStaging": [16, 8, 2],  # specify voxel size (mm) since isotropic_resample is set
+        "iterationStaging": [5, 5, 5],
+        "smoothingSigmas": [0, 0, 0],
         "ncores": 8,
-        "trace": True,
+        "trace": False,
     },
     "IARSettings": {
-        "referenceStructure": "WHOLEHEART",
+        "referenceStructure": "HEART",
         "smoothDistanceMaps": True,
         "smoothSigma": 1,
         "zScoreStatistic": "MAD",
         "outlierMethod": "IQR",
         "outlierFactor": 1.5,
-        "minBestAtlases": 3,
-        "project_on_sphere":False,
+        "minBestAtlases": 5,
+        "project_on_sphere": False,
     },
-    "labelFusionSettings": {"voteType": "local",
-                            "optimalThreshold":
-                                {
-                                "HEART": 0.5,
-                                "LUNG_L": 0.5,
-                                "LUNG_R": 0.5,
-                                "ESOPHAGUS": 0.5,
-                                "SPINALCORD": 0.5
-                                }
-                            },
+    "labelFusionSettings": {
+        "voteType": "majority",
+        "voteParams": {},  # No parameters needed for majority voting
+        "optimalThreshold": {"HEART": 0.5},
+    },
     "vesselSpliningSettings": {
         "vesselNameList": [],
         "vesselRadius_mm": {},
         "spliningDirection": {},
         "stopCondition": {},
-        "stopConditionValue": {},
-    }
+        "stopConditionValue": {}
+    },
 }
 
-def SimpleSeg(image, output_name, settings=settings):
-    """
-    Implements the SimpleSeg framework to provide cardiac atlas based segmentation.
 
+def run_cardiac_segmentation(image, settings=CARDIAC_SETTINGS_DEFAULTS):
+    """Runs the atlas-based cardiac segmentation
+
+    Args:
+        img (sitk.Image):
+        settings (dict, optional): Dictionary containing settings for algorithm.
+                                   Defaults to default_settings.
+
+    Returns:
+        dict: Dictionary containing output of segmentation
     """
 
-    logger.info("Running Cardiac Segmentation")
-    logger.info("Using settings: " + str(settings))
+    results = {}
 
     """
     Initialisation - Read in atlases
@@ -105,17 +104,18 @@ def SimpleSeg(image, output_name, settings=settings):
 
         Atlas structure:
         'ID': 'Original': 'CT Image'    : sitk.Image
-                          'Struct A'    : sitk.Image
-                          'Struct B'    : sitk.Image
-              'RIR'     : 'CT Image'    : sitk.Image
-                          'Transform'   : transform parameter map
-                          'Struct A'    : sitk.Image
-                          'Struct B'    : sitk.Image
-              'DIR'     : 'CT Image'    : sitk.Image
-                          'Transform'   : displacement field transform
-                          'Weight Map'  : sitk.Image
-                          'Struct A'    : sitk.Image
-                          'Struct B'    : sitk.Image
+                            'Struct A'    : sitk.Image
+                            'Struct B'    : sitk.Image
+                'RIR'     : 'CT Image'    : sitk.Image
+                            'Transform'   : transform parameter map
+                            'Struct A'    : sitk.Image
+                            'Struct B'    : sitk.Image
+                'DIR'     : 'CT Image'    : sitk.Image
+                            'Transform'   : displacement field transform
+                            'Weight Map'  : sitk.Image
+                            'Struct A'    : sitk.Image
+                            'Struct B'    : sitk.Image
+
 
     """
 
@@ -125,20 +125,21 @@ def SimpleSeg(image, output_name, settings=settings):
     atlas_id_list = settings["atlasSettings"]["atlasIdList"]
     atlas_structures = settings["atlasSettings"]["atlasStructures"]
 
+    atlas_image_format = settings["atlasSettings"]["atlasImageFormat"]
+    atlas_label_format = settings["atlasSettings"]["atlasLabelFormat"]
+
     atlas_set = {}
     for atlas_id in atlas_id_list:
         atlas_set[atlas_id] = {}
         atlas_set[atlas_id]["Original"] = {}
 
         atlas_set[atlas_id]["Original"]["CT Image"] = sitk.ReadImage(
-            "{0}/{1}/Images/{1}_CROP.nii.gz".format(atlas_path, atlas_id)
+            f"{atlas_path}/{atlas_image_format.format(atlas_id)}"
         )
 
         for struct in atlas_structures:
             atlas_set[atlas_id]["Original"][struct] = sitk.ReadImage(
-                "{0}/{1}/Structures/{1}_{2}_CROP.nii.gz".format(
-                    atlas_path, atlas_id, struct
-                )
+                f"{atlas_path}/{atlas_label_format.format(atlas_id, struct)}"
             )
 
     """
@@ -148,62 +149,86 @@ def SimpleSeg(image, output_name, settings=settings):
     - Target image is cropped
     """
     # Settings
-    quick_reg_settings = {"shrinkFactors": [8, 2],
-                          "smoothSigmas": [8, 2],
-                          "samplingRate": 0.2
-                         }
+    quick_reg_settings = {
+        "shrinkFactors": [16],
+        "smoothSigmas": [0],
+        "samplingRate": 0.75,
+        "defaultValue": -1024,
+        "numberOfIterations": 25,
+        "finalInterp": 3,
+        "metric": "mean_squares",
+    }
 
     registered_crop_images = []
 
-    for atlas_id in atlas_id_list[:max([5, len(atlas_id_list)])]:
+    logger.info(f"Running initial similarity tranform to crop image volume")
+
+    for atlas_id in atlas_id_list[: min([8, len(atlas_id_list)])]:
+
+        logger.info(f"  > atlas {atlas_id}")
+
         # Register the atlases
         atlas_set[atlas_id]["RIR"] = {}
         atlas_image = atlas_set[atlas_id]["Original"]["CT Image"]
 
-        reg_image, crop_tfm = initial_registration(
+        reg_image, _ = initial_registration(
             image,
             atlas_image,
             moving_structure=False,
             fixed_structure=False,
             options=quick_reg_settings,
             trace=False,
-            reg_method="Rigid",
+            reg_method="Similarity",
         )
 
         registered_crop_images.append(reg_image)
 
-    combined_image_extent = (sum(registered_crop_images) > 0)
+        del reg_image
+
+    combined_image_extent = sum(registered_crop_images) / len(registered_crop_images) > -1000
 
     shape_filter = sitk.LabelShapeStatisticsImageFilter()
     shape_filter.Execute(combined_image_extent)
     bounding_box = np.array(shape_filter.GetBoundingBox(1))
 
     expansion = settings["autoCropSettings"]["expansion"]
+    expansion_array = expansion * np.array(image.GetSpacing())
 
     # Avoid starting outside the image
-    crop_box_index = np.max([bounding_box[:3]-expansion, np.array([0,0,0])], axis=0)
+    crop_box_index = np.max([bounding_box[:3] - expansion_array, np.array([0, 0, 0])], axis=0)
 
     # Avoid ending outside the image
-    crop_box_size = np.min([np.array(image.GetSize())-crop_box_index,  bounding_box[3:]+2*expansion], axis=0)
+    crop_box_size = np.min(
+        [np.array(image.GetSize()) - crop_box_index, bounding_box[3:] + 2 * expansion_array], axis=0
+    )
 
     crop_box_size = [int(i) for i in crop_box_size]
     crop_box_index = [int(i) for i in crop_box_index]
 
-    img_crop = sitk.RegionOfInterest(image, size=crop_box_size, index=crop_box_index)
+    logger.info("Calculated crop box")
+    logger.info(f"  > Index = {crop_box_index}")
+    logger.info(f"  > Size = {crop_box_size}")
+    logger.info(f"  > Volume reduced by factor {np.product(image.GetSize())/np.product(crop_box_size):.3f}")
 
-    #sitk.WriteImage(img_crop, "image_crop.nii.gz")
+    img_crop = sitk.RegionOfInterest(image, size=crop_box_size, index=crop_box_index)
 
     """
     Step 2 - Rigid registration of target images
     - Individual atlas images are registered to the target
     - The transformation is used to propagate the labels onto the target
     """
+
     initial_reg = settings["rigidSettings"]["initialReg"]
     rigid_options = settings["rigidSettings"]["options"]
     trace = settings["rigidSettings"]["trace"]
     guide_structure = settings["rigidSettings"]["guideStructure"]
 
+    logger.info(f"Running secondary {initial_reg} registration")
+
     for atlas_id in atlas_id_list:
+
+        logger.info(f"  > atlas {atlas_id}")
+
         # Register the atlases
         atlas_set[atlas_id]["RIR"] = {}
         atlas_image = atlas_set[atlas_id]["Original"]["CT Image"]
@@ -239,20 +264,32 @@ def SimpleSeg(image, output_name, settings=settings):
     - Using Fast Symmetric Diffeomorphic Demons
     """
     # Settings
+    isotropic_resample = settings["deformableSettings"]["isotropicResample"]
     resolution_staging = settings["deformableSettings"]["resolutionStaging"]
     iteration_staging = settings["deformableSettings"]["iterationStaging"]
+    smoothing_sigmas = settings["deformableSettings"]["smoothingSigmas"]
     ncores = settings["deformableSettings"]["ncores"]
     trace = settings["deformableSettings"]["trace"]
 
+    logger.info(f"Running tertiary fast symmetric forces demons registration")
+
     for atlas_id in atlas_id_list:
+
+        logger.info(f"  > atlas {atlas_id}")
+
         # Register the atlases
         atlas_set[atlas_id]["DIR"] = {}
         atlas_image = atlas_set[atlas_id]["RIR"]["CT Image"]
+
+        cleaned_img_crop = sitk.Mask(img_crop, atlas_image > -1023, outsideValue=-1024)
+
         deform_image, deform_field = fast_symmetric_forces_demons_registration(
-            img_crop,
+            cleaned_img_crop,
             atlas_image,
             resolution_staging=resolution_staging,
             iteration_staging=iteration_staging,
+            isotropic_resample=isotropic_resample,
+            smoothing_sigmas=smoothing_sigmas,
             ncores=ncores,
             trace=trace,
         )
@@ -273,13 +310,13 @@ def SimpleSeg(image, output_name, settings=settings):
     Step 4 - Iterative atlas removal
     - This is an automatic process that will attempt to remove inconsistent atlases from the entire set
 
-    Not included in this example - stay tuned for an update!
-    Code is available in this repository, example:
-
-    # Use simple GWV as this minises the potentially negative influence of mis-registered atlases
+    """
+    # Compute weight maps
+    # Here we use simple majority voting as this reduces the potentially negative influence of mis-registered atlases
+    # Voting will be performed again after IAR
     for atlas_id in atlas_id_list:
         atlas_image = atlas_set[atlas_id]["DIR"]["CT Image"]
-        weight_map = compute_weight_map(img_crop, atlas_image, vote_type='global')
+        weight_map = compute_weight_map(img_crop, atlas_image, vote_type="majority")
         atlas_set[atlas_id]["DIR"]["Weight Map"] = weight_map
 
     reference_structure = settings["IARSettings"]["referenceStructure"]
@@ -302,44 +339,48 @@ def SimpleSeg(image, output_name, settings=settings):
         n_factor=outlier_factor,
         iteration=0,
         single_step=False,
-        project_on_sphere=project_on_sphere
+        project_on_sphere=project_on_sphere,
     )
-
-    """
 
     """
     Step 4 - Vessel Splining
 
-    Not included in this example - stay tuned for an update!
-    Code is available in this repository, example:
+    """
 
     vessel_name_list = settings["vesselSpliningSettings"]["vesselNameList"]
-    vessel_radius_mm = settings["vesselSpliningSettings"]["vesselRadius_mm"]
-    splining_direction = settings["vesselSpliningSettings"]["spliningDirection"]
-    stop_condition = settings["vesselSpliningSettings"]["stopCondition"]
-    stop_condition_value = settings["vesselSpliningSettings"]["stopConditionValue"]
 
-    segmented_vessel_dict = vesselSplineGeneration(
-        atlas_set,
-        vessel_name_list,
-        vesselRadiusDict=vessel_radius_mm,
-        stopConditionTypeDict=stop_condition,
-        stopConditionValueDict=stop_condition_value,
-        scanDirectionDict=splining_direction,
-    )
+    if len(vessel_name_list) > 0:
 
-    """
+        vessel_radius_mm = settings["vesselSpliningSettings"]["vesselRadius_mm"]
+        splining_direction = settings["vesselSpliningSettings"]["spliningDirection"]
+        stop_condition = settings["vesselSpliningSettings"]["stopCondition"]
+        stop_condition_value = settings["vesselSpliningSettings"]["stopConditionValue"]
+
+        segmented_vessel_dict = vesselSplineGeneration(
+            img_crop,
+            atlas_set,
+            vessel_name_list,
+            vessel_radius_mm,
+            stop_condition,
+            stop_condition_value,
+            splining_direction,
+        )
+    else:
+        logger.info("No vessel splining required, continue.")
 
     """
     Step 5 - Label Fusion
     """
     # Compute weight maps
+    vote_type = settings["labelFusionSettings"]["voteType"]
+    vote_params = settings["labelFusionSettings"]["voteParams"]
 
-    vote_type = settings['labelFusionSettings']['voteType']
-
+    # Compute weight maps
     for atlas_id in list(atlas_set.keys()):
         atlas_image = atlas_set[atlas_id]["DIR"]["CT Image"]
-        weight_map = compute_weight_map(img_crop, atlas_image, vote_type=vote_type)
+        weight_map = compute_weight_map(
+            img_crop, atlas_image, vote_type=vote_type, vote_params=vote_params
+        )
         atlas_set[atlas_id]["DIR"]["Weight Map"] = weight_map
 
     combined_label_dict = combine_labels(atlas_set, atlas_structures)
@@ -348,41 +389,31 @@ def SimpleSeg(image, output_name, settings=settings):
     Step 6 - Paste the cropped structure into the original image space
     """
 
-    output_dir = settings['outputSettings']['outputDir']
-    auto_structs = {}
+    template_img_binary = sitk.Cast((image * 0), sitk.sitkUInt8)
+    template_img_float = sitk.Cast((image * 0), sitk.sitkFloat64)
 
-    template_im = sitk.Cast((image * 0), sitk.sitkUInt8)
     vote_structures = settings["labelFusionSettings"]["optimalThreshold"].keys()
 
     for structure_name in vote_structures:
+
+        probability_map = combined_label_dict[structure_name]
+
         optimal_threshold = settings["labelFusionSettings"]["optimalThreshold"][structure_name]
-        binary_struct = process_probability_image(
-            combined_label_dict[structure_name], optimal_threshold
+
+        binary_struct = process_probability_image(probability_map, optimal_threshold)
+
+        paste_binary_img = sitk.Paste(
+            template_img_binary, binary_struct, binary_struct.GetSize(), (0, 0, 0), crop_box_index
         )
-        paste_img = sitk.Paste(
-            template_im, binary_struct, binary_struct.GetSize(), (0, 0, 0), crop_box_index
+
+        results[structure_name] = paste_binary_img
+
+    for structure_name in vessel_name_list:
+        binary_struct = segmented_vessel_dict[structure_name]
+        paste_binary_img = sitk.Paste(
+            template_img_binary, binary_struct, binary_struct.GetSize(), (0, 0, 0), crop_box_index
         )
 
-        # Write the mask to a file in the working_dir
-        mask_file = os.path.join(output_dir, f'{output_name}/{output_name}_{structure_name}_AUTO.nii.gz')
+        results[structure_name] = paste_binary_img
 
-        try:
-            os.mkdir(os.path.join(output_dir, f'{output_name}'))
-        except:
-            print('Output directory already exists')
-
-        sitk.WriteImage(paste_img, mask_file)
-
-        # Append the data to return
-        auto_structs[structure_name] = paste_img
-
-    return auto_structs
-
-
-if __name__ == "__main__":
-    test_id = 'Train-S1-009'
-    test_image = sitk.ReadImage(f'./data/{test_id}/Images/{test_id}.nii.gz')
-
-    output_name = test_id
-
-    auto_structs = SimpleSeg(image=test_image, output_name=output_name, settings=settings)
+    return results
