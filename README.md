@@ -58,25 +58,7 @@ This collection may not be used for commercial purposes. This collection is free
 
 ### Demonstration
 
-The SimpleSeg codebase is included (in the *code* directory), and a demonstration of how this code can be used for end-to-end segmentation is available in the *SimpleSeg.py* script.
-
-Have a read of the *SimpleSeg.py* script, most of the settings are made to be user-understandable. At the bottom of the script, the target image is defined.
-
-The script can be run in a terminal:
-
-```
-python SimpleSeg.py
-```
-
-### Measuring segmentation accuracy
-
-We include a simple script to generate quantitative label similarity metrics, this is useful to evaluate the performance of an automatic segmentation algorithm. To run this script, in a terminal:
-
-```
-python ComputeMetrics.py
-```
-
-This will create a CSV file containing results.
+To get started, an Python script is included in the **examples** directory.
 
 # Additional information
 
