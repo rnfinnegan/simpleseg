@@ -59,7 +59,7 @@ def initial_registration(
     default_value=-1024,
     trace=False,
     reg_method="Similarity",
-    optimiser='GradientDescentLineSearch'
+    optimiser='gradient_descent_line_search'
 ):
     """
     Rigid image registration using ITK
@@ -137,7 +137,7 @@ def initial_registration(
     else:
         raise ValueError('You have selected a registration method that does not exist.\n Please select from Translation, Similarity, Affine, Rigid')
 
-    if optimiser == 'LBGGSB':
+    if optimiser == 'LBFGSB':
         registration.SetOptimizerAsLBFGSB(
             gradientConvergenceTolerance=1e-5,
             numberOfIterations=number_of_iterations,
@@ -146,7 +146,7 @@ def initial_registration(
             costFunctionConvergenceFactor=1e7,
             trace=trace,
         )
-    elif optimiser == 'Exhaustive':
+    elif optimiser == 'exhaustive':
         """
         This isn't well implemented
         Needs some work to give options for sampling rates
@@ -154,11 +154,19 @@ def initial_registration(
         """
         samples = [10,10,10,10,10,10]
         registration.SetOptimizerAsExhaustive(samples)
-    elif optimiser=='GradientDescentLineSearch':
+
+    elif optimiser=='gradient_descent_line_search':
         registration.SetOptimizerAsGradientDescentLineSearch(
             learningRate = 1.0,
             numberOfIterations = number_of_iterations
         )
+
+    elif optimiser=='gradient_descent':
+        registration.SetOptimizerAsGradientDescentLineSearch(
+            learningRate = 1.0,
+            numberOfIterations = number_of_iterations
+        )
+
 
     if trace:
         registration.AddCommand(

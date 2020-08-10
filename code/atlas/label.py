@@ -77,7 +77,7 @@ def compute_weight_map(
     square_difference_image = sitk.SquaredDifference(target_image, moving_image)
     square_difference_image = sitk.Cast(square_difference_image, sitk.sitkFloat32)
 
-    if vote_type.lower() == "majority":
+    if vote_type.lower() == "unweighted":
         weight_map = target_image * 0.0 + 1.0
 
     elif vote_type.lower() == "global":

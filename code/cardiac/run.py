@@ -27,22 +27,22 @@ from simpleseg.code.cardiac.cardiac import vesselSplineGeneration
 
 
 CARDIAC_SETTINGS_DEFAULTS = {
-    "outputFormat": "Auto_{0}.nii.gz",
     "atlasSettings": {
-        "atlasIdList": ["Train-S1-001","Train-S1-003","Train-S1-004","Train-S1-005"],
-        "atlasStructures": ["HEART"],
-        "atlasPath": './data',
-        "atlasImageFormat": "{0}/Images/{0}_CROP.nii.gz",
-        "atlasLabelFormat": "{0}/Structures/{0}_{1}_CROP.nii.gz",
+        "atlasIdList": ["002","003","005","006","007","008"],
+        "atlasStructures": ["Heart","Lung-Left","Lung-Right","Esophagus","Spinal-Cord"],
+        "atlasPath": '../data/NIFTI_CONVERTED',
+        "atlasImageFormat": "Study_{0}/Study_{0}.nii.gz",
+        "atlasLabelFormat": "Study_{0}/Study_{0}_{1}.nii.gz",
     },
-    "autoCropSettings": {"expansion": [2, 2, 2],},
-    "rigidSettings": {
+    "autoCropSettings": {"expansion": [0,0,0],},
+    "intialRegSettings": {
         "initialReg": "Similarity",
         "options": {
             "shrinkFactors": [16, 8, 4],
             "smoothSigmas": [0, 0, 0],
             "samplingRate": 0.75,
             "defaultValue": -1024,
+            "optimiser": "gradient_descent",
             "numberOfIterations": 50,
             "finalInterp": sitk.sitkBSpline,
             "metric": "mean_squares",
@@ -59,7 +59,7 @@ CARDIAC_SETTINGS_DEFAULTS = {
         "trace": False,
     },
     "IARSettings": {
-        "referenceStructure": "HEART",
+        "referenceStructure": "Heart",
         "smoothDistanceMaps": True,
         "smoothSigma": 1,
         "zScoreStatistic": "MAD",
@@ -69,16 +69,20 @@ CARDIAC_SETTINGS_DEFAULTS = {
         "project_on_sphere": False,
     },
     "labelFusionSettings": {
-        "voteType": "majority",
-        "voteParams": {},  # No parameters needed for majority voting
-        "optimalThreshold": {"HEART": 0.5},
+        "voteType": "unweighted",
+        "voteParams": {},
+        "optimalThreshold":    {"Heart":0.5,
+                                "Lung-Left":0.5,
+                                "Lung-Right":0.5,
+                                "Esophagus":0.5,
+                                }
     },
     "vesselSpliningSettings": {
-        "vesselNameList": [],
-        "vesselRadius_mm": {},
-        "spliningDirection": {},
-        "stopCondition": {},
-        "stopConditionValue": {}
+        "vesselNameList": ['Spinal-Cord'],
+        "vesselRadius_mm": {'Spinal-Cord': 6},
+        "spliningDirection": {'Spinal-Cord': 'z'},
+        "stopCondition": {'Spinal-Cord': 'count'},
+        "stopConditionValue": {'Spinal-Cord': 2}
     },
 }
 
@@ -218,10 +222,10 @@ def run_cardiac_segmentation(image, settings=CARDIAC_SETTINGS_DEFAULTS):
     - The transformation is used to propagate the labels onto the target
     """
 
-    initial_reg = settings["rigidSettings"]["initialReg"]
-    rigid_options = settings["rigidSettings"]["options"]
-    trace = settings["rigidSettings"]["trace"]
-    guide_structure = settings["rigidSettings"]["guideStructure"]
+    initial_reg = settings["intialRegSettings"]["initialReg"]
+    rigid_options = settings["intialRegSettings"]["options"]
+    trace = settings["intialRegSettings"]["trace"]
+    guide_structure = settings["intialRegSettings"]["guideStructure"]
 
     logger.info(f"Running secondary {initial_reg} registration")
 
@@ -312,11 +316,11 @@ def run_cardiac_segmentation(image, settings=CARDIAC_SETTINGS_DEFAULTS):
 
     """
     # Compute weight maps
-    # Here we use simple majority voting as this reduces the potentially negative influence of mis-registered atlases
+    # Here we use simple unweighted voting as this reduces the potentially negative influence of mis-registered atlases
     # Voting will be performed again after IAR
     for atlas_id in atlas_id_list:
         atlas_image = atlas_set[atlas_id]["DIR"]["CT Image"]
-        weight_map = compute_weight_map(img_crop, atlas_image, vote_type="majority")
+        weight_map = compute_weight_map(img_crop, atlas_image, vote_type="unweighted")
         atlas_set[atlas_id]["DIR"]["Weight Map"] = weight_map
 
     reference_structure = settings["IARSettings"]["referenceStructure"]
