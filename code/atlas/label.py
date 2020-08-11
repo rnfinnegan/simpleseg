@@ -6,7 +6,57 @@ from functools import reduce
 
 import SimpleITK as sitk
 import numpy as np
+import itk
 
+def sitk_to_itk(sitk_image):
+    """
+    Helper function to convert SimpleITK images to ITK images
+    """
+    sitk_arr = sitk.GetArrayFromImage(sitk_image)
+
+    itk_image = itk.GetImageFromArray(sitk_arr, is_vector = False)
+    itk_image.SetOrigin(sitk_image.GetOrigin())
+    itk_image.SetSpacing(sitk_image.GetSpacing())
+    itk_image.SetDirection(itk.GetMatrixFromArray(np.reshape(np.array(sitk_image.GetDirection()), [3]*2)))
+
+    return itk_image
+
+def itk_to_sitk(itk_image):
+    """
+    Helper function to convert ITK images to SimpleITK images
+    """
+    sitk_image = sitk.GetImageFromArray(itk.GetArrayFromImage(itk_image), isVector=False)
+    sitk_image.SetOrigin(tuple(itk_image.GetOrigin()))
+    sitk_image.SetSpacing(tuple(itk_image.GetSpacing()))
+    sitk_image.SetDirection(itk.GetArrayFromMatrix(itk_image.GetDirection()).flatten())
+
+    return sitk_image
+
+def morphological_interpolate(sitk_image):
+    """
+    Performs morphological interpolation
+    See: https://github.com/KitwareMedical/ITKMorphologicalContourInterpolation
+
+    Useful for filling in gaps in contouring between slices
+    """
+
+    itk_image = sitk_to_itk(sitk_image)
+
+    output_type = itk.Image[itk.UC, 3]
+
+    f_cast = itk.CastImageFilter[itk_image, output_type].New()
+    f_cast.SetInput(itk_image)
+    img_cast = f_cast.GetOutput()
+
+    f_interpolator = itk.MorphologicalContourInterpolator.New()
+    f_interpolator.SetInput(img_cast)
+    f_interpolator.Update()
+
+    img_interpolated = f_interpolator.GetOutput()
+
+    sitk_img_interpolated = itk_to_sitk(img_interpolated)
+
+    return sitk_img_interpolated
 
 def compute_weight_map(
     target_image,
@@ -27,7 +77,7 @@ def compute_weight_map(
     square_difference_image = sitk.SquaredDifference(target_image, moving_image)
     square_difference_image = sitk.Cast(square_difference_image, sitk.sitkFloat32)
 
-    if vote_type.lower() == "majority":
+    if vote_type.lower() == "unweighted":
         weight_map = target_image * 0.0 + 1.0
 
     elif vote_type.lower() == "global":
@@ -125,7 +175,7 @@ def combine_labels(atlas_set, structure_name, threshold=1e-4, smooth_sigma=1.0):
         ]
 
         # Sum the weight images
-        weight_sum_image = reduce(lambda x, y: x + y, weight_image_list)
+        weight_sum_image = sum( weight_image_list )
         weight_sum_image = sitk.Mask(
             weight_sum_image, weight_sum_image == 0, maskingValue=1, outsideValue=1
         )
